@@ -4,6 +4,7 @@ type TpsInput = {
   completedAt?: number
   firstTokenAt?: number
   lastTokenAt?: number
+  toolExecutionMs?: number
 }
 
 export function calculateTPS(input: TpsInput) {
@@ -18,7 +19,11 @@ export function calculateTPS(input: TpsInput) {
 
   if (!Number.isFinite(durationMs) || durationMs <= 0) return null
 
-  const tps = input.outputTokens / (durationMs / 1000)
+  const toolExecutionMs = Math.max(0, input.toolExecutionMs ?? 0)
+  const effectiveDurationMs = durationMs - toolExecutionMs
+  if (effectiveDurationMs <= 0) return null
+
+  const tps = input.outputTokens / (effectiveDurationMs / 1000)
   const timeToFirstTokenMs = hasPartTiming ? Math.max(0, input.firstTokenAt! - input.createdAt) : null
 
   return {
