@@ -24,19 +24,13 @@ export function calculateTPS(messages: { info: Message; parts: Part[] }[]) {
     totalTokens += (msg.info.tokens?.output ?? 0) + (msg.info.tokens?.reasoning ?? 0)
   }
 
-  const startedAt = Math.min(
-    ...assistant
-      .map(msg => msg.info.time.created)
-      .filter((time): time is number => typeof time === "number")
+  const hasCompleteTimestamps = assistant.every(
+    msg => typeof msg.info.time.created === "number" && typeof msg.info.time.completed === "number"
   )
 
-  const completedAt = Math.max(
-    ...assistant
-      .map(msg => msg.info.time.completed)
-      .filter((time): time is number => typeof time === "number")
-  )
-
-  if (Number.isFinite(startedAt) && Number.isFinite(completedAt)) {
+  if (hasCompleteTimestamps) {
+    const startedAt = Math.min(...assistant.map(msg => msg.info.time.created))
+    const completedAt = Math.max(...assistant.map(msg => msg.info.time.completed!))
     totalTimeMs = completedAt - startedAt
   } else {
     const streamingParts = assistant.flatMap(msg => msg.parts.filter(isStreamingPart))

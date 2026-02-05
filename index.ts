@@ -19,8 +19,7 @@ export const TPSCounterPlugin: Plugin = async ({ client }) => {
 
           if (!response.data?.length) return
 
-          const lastMsg = response.data[response.data.length - 1]
-          if (!lastMsg) return
+          const lastMsg = response.data[response.data.length - 1]!
           const isTpsReport = lastMsg.parts.some(p => p.type === "text" && p.text.includes("▣ TPS |"))
           if (isTpsReport) return
 
