@@ -1,9 +1,11 @@
-import type { Message, AssistantMessage, Part } from "@opencode-ai/sdk"
+import type { Message, AssistantMessage, Part, TextPart, ReasoningPart } from "@opencode-ai/sdk"
 
-export function calculateTPS(
-  messages: { info: Message; parts: Part[] }[], 
-  timings: Map<string, { start?: number; end?: number }>
-) {
+function isStreamingPart(part: Part): part is TextPart | ReasoningPart {
+  if (part.type !== "text" && part.type !== "reasoning") return false
+  return Boolean(part.time?.start && part.time.end)
+}
+
+export function calculateTPS(messages: { info: Message; parts: Part[] }[]) {
   const reversedIndex = [...messages].reverse().findIndex(m => m.info.role === "user")
   if (reversedIndex === -1) return null
 
@@ -20,12 +22,27 @@ export function calculateTPS(
 
   for (const msg of assistant) {
     totalTokens += (msg.info.tokens?.output ?? 0) + (msg.info.tokens?.reasoning ?? 0)
-    
-    const t = timings.get(msg.info.id)
-    if (t?.start && t.end) {
-      // Beginning of the message stream to the final stream
-      const duration = t.end - t.start
-      totalTimeMs += duration
+  }
+
+  const startedAt = Math.min(
+    ...assistant
+      .map(msg => msg.info.time.created)
+      .filter((time): time is number => typeof time === "number")
+  )
+
+  const completedAt = Math.max(
+    ...assistant
+      .map(msg => msg.info.time.completed)
+      .filter((time): time is number => typeof time === "number")
+  )
+
+  if (Number.isFinite(startedAt) && Number.isFinite(completedAt)) {
+    totalTimeMs = completedAt - startedAt
+  } else {
+    const streamingParts = assistant.flatMap(msg => msg.parts.filter(isStreamingPart))
+    if (streamingParts.length === 0) return null
+    for (const part of streamingParts) {
+      totalTimeMs += part.time!.end! - part.time!.start!
     }
   }
 

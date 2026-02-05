@@ -2,21 +2,10 @@ import type { Plugin } from "@opencode-ai/plugin"
 import { calculateTPS } from "./utils"
 
 export const TPSCounterPlugin: Plugin = async ({ client }) => {
-  const timings = new Map<string, { start?: number; end?: number }>()
-
   return {
     "chat.params": async () => {},
 
     event: async ({ event }) => {
-      // Track arrival times of the first and last tokens for each message
-      if (event.type === "message.part.updated") {
-        const mid = event.properties.part.messageID
-        const current = timings.get(mid) || {}
-        if (!current.start) current.start = Date.now()
-        current.end = Date.now()
-        timings.set(mid, current)
-      }
-
       if (event.type === "session.idle") {
         const sid = event.properties.sessionID
         
@@ -31,13 +20,11 @@ export const TPSCounterPlugin: Plugin = async ({ client }) => {
           if (!response.data?.length) return
 
           const lastMsg = response.data[response.data.length - 1]
+          if (!lastMsg) return
           const isTpsReport = lastMsg.parts.some(p => p.type === "text" && p.text.includes("▣ TPS |"))
           if (isTpsReport) return
 
-          const tps = calculateTPS(response.data, timings)
-          
-          // Cleanup tracked timings for this turn
-          response.data.forEach(m => timings.delete(m.info.id))
+          const tps = calculateTPS(response.data)
 
           if (tps) {
             await client.session.prompt({
