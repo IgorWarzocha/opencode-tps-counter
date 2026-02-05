@@ -1,12 +1,12 @@
-# OpenCode TPS Counter Plugin
+# Openode TPS Counter Plugin
 
-This plugin posts a compact generation speed line after assistant responses in OpenCode:
+This plugin posts a compact generation speed line after assistant responses in opencode:
 
 `▣ Lat.: <value>s | E2E TPS: <value>`
 
 ## Install from npm
 
-Add the plugin package to your OpenCode config. OpenCode installs npm plugins automatically.
+Add the plugin package to your opencode config. Opencode installs npm plugins automatically.
 
 Example `opencode.json`:
 
@@ -23,10 +23,10 @@ https://www.youtube.com/watch?v=um0oBADUUSA
 
 ## What the metrics mean
 
-- `E2E TPS`: Effective local throughput in this OpenCode session.
+- `E2E TPS`: Effective local throughput in this opencode session.
   - Formula: `(output tokens + reasoning tokens) / (effective end - turn start - merged tool execution time)`
   - `effective end` prefers the last streamed token time when available, and falls back to message completion time.
-  - This is measured from OpenCode message/event timestamps, not provider-native telemetry.
+  - This is measured from opencode message/event timestamps, not provider-native telemetry.
 - `Lat.`: Time to first token for the assistant turn.
   - Formula: `first streamed token time - turn start`
   - If streaming timing is unavailable, it shows `n/a`.
@@ -41,7 +41,7 @@ https://www.youtube.com/watch?v=um0oBADUUSA
 
 ## Important limitation
 
-These numbers are based on OpenCode-local timing and token accounting. They are useful for relative comparisons in the same environment, but they will not always match provider dashboards (for example OpenRouter throughput) because provider-side queueing/transport internals are not exposed in plugin events.
+These numbers are based on opencode-local timing and token accounting. They are useful for relative comparisons in the same environment, but they will not always match provider dashboards (for example OpenRouter throughput) because provider-side queueing/transport internals are not exposed in plugin events.
 
 Reliability is highest when a provider streams chunks continuously. If a provider buffers output and flushes large chunks (or nearly the full response) at once, the measured generation window becomes artificially short and the reported rate can spike.
 
