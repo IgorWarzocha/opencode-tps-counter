@@ -60,7 +60,7 @@ export const TPSCounterPlugin: Plugin = async ({ client }) => {
                   parts: [
                     {
                       type: "text",
-                      text: `▣ TPS | ${metrics.tps} tps${ttftText}`,
+                      text: `▣ TPS | ${metrics.tps}${ttftText}`,
                       ignored: true,
                     },
                   ],
