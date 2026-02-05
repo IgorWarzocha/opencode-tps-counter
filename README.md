@@ -42,6 +42,7 @@ Example `opencode.json`:
 
 ```json
 {
+  "$schema": "https://opencode.ai/config.json",
   "plugin": ["@howaboua/opencode-tps-counter@^0.1.0"]
 }
 ```
