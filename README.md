@@ -26,8 +26,6 @@ This plugin posts a compact generation speed line after assistant responses in O
 
 These numbers are based on OpenCode-local timing and token accounting. They are useful for relative comparisons in the same environment, but they will not always match provider dashboards (for example OpenRouter throughput) because provider-side queueing/transport internals are not exposed in plugin events.
 
-The plugin is designed for the canonical `dev` event/model flow. It does not depend on fork-only core wiring.
-
 Reliability is highest when a provider streams chunks continuously. If a provider buffers output and flushes large chunks (or nearly the full response) at once, the measured generation window becomes artificially short and the reported rate can spike.
 
 Example: some Z.ai responses can arrive in bursts where most assistant text appears nearly at once. In that case, the displayed value is less representative of true model-side throughput. This behavior comes from provider streaming characteristics and is not fully fixable from plugin-side event timing.
@@ -36,25 +34,33 @@ Example: some Z.ai responses can arrive in bursts where most assistant text appe
 
 The plugin reports when an assistant message reaches `finish: "stop"` on `message.updated`. This is more reliable than waiting for `session.idle`.
 
-## Notes on compatibility
+## Install from npm
 
-This implementation is intentionally plugin-only and aligned with canonical OpenCode `dev` behavior. It does not depend on custom TUI internals or fork-specific core patches.
+Add the plugin package to your OpenCode config. OpenCode installs npm plugins automatically.
 
-## Setup
+Example `opencode.json`:
+
+```json
+{
+  "plugin": ["@howaboua/opencode-tps-counter@^0.1.0"]
+}
+```
+
+## Local development
+
+Install dev dependencies:
 
 ```bash
 bun install
 ```
 
-Optional type-check:
+Type-check the plugin:
 
 ```bash
 bun x tsc --noEmit
 ```
 
-## Local plugin wiring
-
-Example `opencode.jsonc` snippet:
+Use local plugin wiring while developing:
 
 ```jsonc
 {
