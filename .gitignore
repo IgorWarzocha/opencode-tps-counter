@@ -1,1 +1,6 @@
+node_modules/
+.opencode/
 opencode/
+*.log
+.DS_Store
+dist/

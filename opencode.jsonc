@@ -2,6 +2,6 @@
   "$schema": "https://opencode.ai/config.json",
   "plugin": [
     "@howaboua/create-opencode-plugin@latest",
-    "file:///home/igorw/Work/opencode-plugins-dev/opencode-tps-counter/.opencode/plugin/tps-counter/index.ts"
-  ]
+    "file:///home/igorw/Work/opencode-plugins-dev/opencode-tps-counter/index.ts",
+  ],
 }

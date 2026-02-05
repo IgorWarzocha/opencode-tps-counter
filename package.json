@@ -1,0 +1,16 @@
+{
+  "name": "tps-counter",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@opencode-ai/plugin": "^1.1.51",
+    "@opencode-ai/sdk": "^1.1.51"
+  }
+}
