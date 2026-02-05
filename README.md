@@ -1,4 +1,4 @@
-# Openode TPS Counter Plugin
+# Opencode TPS Counter Plugin
 
 This plugin posts a compact generation speed line after assistant responses in opencode:
 
