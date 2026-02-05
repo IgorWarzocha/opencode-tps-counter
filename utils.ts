@@ -17,32 +17,34 @@ export function calculateTPS(messages: { info: Message; parts: Part[] }[]) {
 
   if (!assistant.length) return null
 
+  const latestAssistant = assistant[assistant.length - 1]
+  if (!latestAssistant) return null
+
   let totalTokens = 0
   let totalTimeMs = 0
 
-  for (const msg of assistant) {
-    totalTokens += (msg.info.tokens?.output ?? 0) + (msg.info.tokens?.reasoning ?? 0)
-  }
+  totalTokens = latestAssistant.info.tokens?.output ?? 0
 
-  const hasCompleteTimestamps = assistant.every(
-    msg => typeof msg.info.time.created === "number" && typeof msg.info.time.completed === "number"
+  const streamingParts = latestAssistant.parts.filter(isStreamingPart)
+  if (streamingParts.length === 0) return null
+
+  const firstTokenAt = Math.min(...streamingParts.map(part => part.time!.start!))
+  const lastTokenAt = Math.max(...streamingParts.map(part => part.time!.end!))
+  const completedAt = latestAssistant.info.time.completed
+  totalTimeMs = Math.max(
+    0,
+    typeof completedAt === "number" ? completedAt - firstTokenAt : lastTokenAt - firstTokenAt
   )
 
-  if (hasCompleteTimestamps) {
-    const startedAt = Math.min(...assistant.map(msg => msg.info.time.created))
-    const completedAt = Math.max(...assistant.map(msg => msg.info.time.completed!))
-    totalTimeMs = completedAt - startedAt
-  } else {
-    const streamingParts = assistant.flatMap(msg => msg.parts.filter(isStreamingPart))
-    if (streamingParts.length === 0) return null
-    for (const part of streamingParts) {
-      totalTimeMs += part.time!.end! - part.time!.start!
-    }
-  }
+  const createdAt = latestAssistant.info.time.created
+  const timeToFirstTokenMs = typeof createdAt === "number" ? Math.max(0, firstTokenAt - createdAt) : null
 
   // Ensure we have a valid non-zero duration to avoid division by zero
   if (totalTimeMs <= 0 || totalTokens === 0) return null
 
   const tps = totalTokens / (totalTimeMs / 1000)
-  return Number(tps.toFixed(2))
+  return {
+    tps: Number(tps.toFixed(2)),
+    timeToFirstTokenMs,
+  }
 }
