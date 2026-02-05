@@ -1,76 +1,80 @@
 import type { Plugin } from "@opencode-ai/plugin"
+import type { Part, ReasoningPart, TextPart } from "@opencode-ai/sdk"
 import { calculateTPS } from "./utils"
 
+function isTimedStreamPart(part: Part): part is TextPart | ReasoningPart {
+  return (part.type === "text" || part.type === "reasoning") && typeof part.time?.start === "number"
+}
+
 export const TPSCounterPlugin: Plugin = async ({ client }) => {
-  const firstTokenAtByMessage = new Map<string, number>()
-  const lastTokenAtByMessage = new Map<string, number>()
+  const streamPartTypes = new Set(["text", "reasoning"])
+  const messageTimingByID = new Map<string, { first?: number; last?: number }>()
+  const reportedMessageIDs = new Set<string>()
 
   return {
-    "chat.params": async () => {},
-
     event: async ({ event }) => {
       if (event.type === "message.part.updated") {
         const part = event.properties.part
-        if ((part.type === "text" || part.type === "reasoning") && part.time?.start) {
-          const currentFirst = firstTokenAtByMessage.get(part.messageID)
-          const nextFirst = currentFirst ? Math.min(currentFirst, part.time.start) : part.time.start
-          firstTokenAtByMessage.set(part.messageID, nextFirst)
+        if (!streamPartTypes.has(part.type) || !isTimedStreamPart(part)) return
 
-          const partEnd = part.time.end ?? part.time.start
-          const currentLast = lastTokenAtByMessage.get(part.messageID)
-          const nextLast = currentLast ? Math.max(currentLast, partEnd) : partEnd
-          lastTokenAtByMessage.set(part.messageID, nextLast)
-        }
+        const timing = messageTimingByID.get(part.messageID) ?? {}
+        const partStart = part.time!.start
+        timing.first = typeof timing.first === "number" ? Math.min(timing.first, partStart) : partStart
+        const partEnd = part.time!.end ?? partStart
+        timing.last = typeof timing.last === "number" ? Math.max(timing.last, partEnd) : partEnd
+        messageTimingByID.set(part.messageID, timing)
       }
 
       if (event.type === "message.updated") {
         const info = event.properties.info
-        if (
-          info.role === "assistant" &&
-          info.finish === "stop" &&
-          typeof info.time.completed === "number"
-        ) {
+        if (info.role !== "assistant") return
+
+        if (info.finish && info.finish !== "stop") {
+          messageTimingByID.delete(info.id)
+          reportedMessageIDs.delete(info.id)
+          return
+        }
+
+        if (info.finish === "stop" && typeof info.time.completed === "number") {
+          if (reportedMessageIDs.has(info.id)) return
+          reportedMessageIDs.add(info.id)
+
+          const timing = messageTimingByID.get(info.id)
+
           try {
-            const response = await client.session.messages({
-              path: { id: info.sessionID }
-            })
-
-            if (!response.data?.length) return
-
-            const lastMsg = response.data[response.data.length - 1]!
-            const isTpsReport = lastMsg.parts.some(p => p.type === "text" && p.text.includes("▣ TPS |"))
-            if (isTpsReport) return
-
             const metrics = calculateTPS({
               outputTokens: (info.tokens?.output ?? 0) + (info.tokens?.reasoning ?? 0),
               createdAt: info.time.created,
-              firstTokenAt: firstTokenAtByMessage.get(info.id),
-              lastTokenAt: lastTokenAtByMessage.get(info.id),
+              completedAt: info.time.completed,
+              firstTokenAt: timing?.first,
+              lastTokenAt: timing?.last,
             })
 
-            if (metrics) {
-              const ttftText =
-                typeof metrics.timeToFirstTokenMs === "number"
-                  ? ` | TTFT: ${(metrics.timeToFirstTokenMs / 1000).toFixed(2)}s`
-                  : ""
-              await client.session.prompt({
-                path: { id: info.sessionID },
-                body: {
-                  noReply: true,
-                  parts: [
-                    {
-                      type: "text",
-                      text: `▣ TPS | ${metrics.tps}${ttftText}`,
-                      ignored: true,
-                    },
-                  ],
-                },
-              })
-            }
+            if (!metrics) return
+
+            const latencyText =
+              typeof metrics.timeToFirstTokenMs === "number"
+                ? `${(metrics.timeToFirstTokenMs / 1000).toFixed(2)}s`
+                : "n/a"
+
+            await client.session.prompt({
+              path: { id: info.sessionID },
+              body: {
+                noReply: true,
+                parts: [
+                  {
+                    type: "text",
+                    text: `▣ Lat.: ${latencyText} | E2E TPS: ${metrics.tps}`,
+                    ignored: true,
+                    metadata: { source: "opencode-tps-counter" },
+                  },
+                ],
+              },
+            })
           } catch {
+            return
           } finally {
-            firstTokenAtByMessage.delete(info.id)
-            lastTokenAtByMessage.delete(info.id)
+            messageTimingByID.delete(info.id)
           }
         }
       }

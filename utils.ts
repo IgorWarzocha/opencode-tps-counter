@@ -1,6 +1,7 @@
 type TpsInput = {
   outputTokens: number
   createdAt: number
+  completedAt?: number
   firstTokenAt?: number
   lastTokenAt?: number
 }
@@ -8,13 +9,17 @@ type TpsInput = {
 export function calculateTPS(input: TpsInput) {
   if (input.outputTokens <= 0) return null
 
-  if (typeof input.firstTokenAt !== "number" || typeof input.lastTokenAt !== "number") return null
+  const hasPartTiming = typeof input.firstTokenAt === "number" && typeof input.lastTokenAt === "number"
+  const durationMs = hasPartTiming
+    ? input.lastTokenAt! - input.createdAt
+    : typeof input.completedAt === "number"
+      ? input.completedAt - input.createdAt
+      : NaN
 
-  const durationMs = input.lastTokenAt - input.createdAt
-  if (durationMs <= 0) return null
+  if (!Number.isFinite(durationMs) || durationMs <= 0) return null
 
   const tps = input.outputTokens / (durationMs / 1000)
-  const timeToFirstTokenMs = Math.max(0, input.firstTokenAt - input.createdAt)
+  const timeToFirstTokenMs = hasPartTiming ? Math.max(0, input.firstTokenAt! - input.createdAt) : null
 
   return {
     tps: Number(tps.toFixed(2)),
