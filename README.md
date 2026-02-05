@@ -4,6 +4,23 @@ This plugin posts a compact generation speed line after assistant responses in O
 
 `▣ Lat.: <value>s | E2E TPS: <value>`
 
+## Install from npm
+
+Add the plugin package to your OpenCode config. OpenCode installs npm plugins automatically.
+
+Example `opencode.json`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["@howaboua/opencode-tps-counter@latest"]
+}
+```
+
+#### If you wanna watch me struggle through making this one, here we are, uncut and raw.
+
+https://www.youtube.com/watch?v=um0oBADUUSA
+
 ## What the metrics mean
 
 - `E2E TPS`: Effective local throughput in this OpenCode session.
@@ -33,19 +50,6 @@ Example: some Z.ai responses can arrive in bursts where most assistant text appe
 ## Trigger behavior
 
 The plugin reports when an assistant message reaches `finish: "stop"` on `message.updated`. This is more reliable than waiting for `session.idle`.
-
-## Install from npm
-
-Add the plugin package to your OpenCode config. OpenCode installs npm plugins automatically.
-
-Example `opencode.json`:
-
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "plugin": ["@howaboua/opencode-tps-counter@^0.1.0"]
-}
-```
 
 ## Local development
 
