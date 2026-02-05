@@ -1,54 +1,91 @@
 import type { Plugin } from "@opencode-ai/plugin"
+import type { AssistantMessage, Part } from "@opencode-ai/sdk"
+import { clearStreamWindows, collectTurnInput, updateStreamWindowFromPart } from "./turn"
+import type { StreamWindowByMessageID } from "./turn"
 import { calculateTPS } from "./utils"
 
 export const TPSCounterPlugin: Plugin = async ({ client }) => {
-  const timings = new Map<string, { start?: number; end?: number }>()
+  const reportedMessageIDs = new Set<string>()
+  const streamWindowByMessageID: StreamWindowByMessageID = new Map()
 
   return {
-    "chat.params": async () => {},
-
     event: async ({ event }) => {
-      // Track arrival times of the first and last tokens for each message
       if (event.type === "message.part.updated") {
-        const mid = event.properties.part.messageID
-        const current = timings.get(mid) || {}
-        if (!current.start) current.start = Date.now()
-        current.end = Date.now()
-        timings.set(mid, current)
+        updateStreamWindowFromPart(streamWindowByMessageID, event.properties.part)
+        return
       }
 
-      if (event.type === "session.idle") {
-        const sid = event.properties.sessionID
-        
-        try {
-          // Small delay to ensure all persistence is complete
-          await new Promise(r => setTimeout(r, 500))
+      if (event.type === "message.removed") {
+        reportedMessageIDs.delete(event.properties.messageID)
+        streamWindowByMessageID.delete(event.properties.messageID)
+        return
+      }
 
-          const response = await client.session.messages({
-            path: { id: sid }
-          })
+      if (event.type !== "message.updated") return
 
-          if (!response.data?.length) return
+      const info = event.properties.info
+      if (info.role !== "assistant" || info.finish !== "stop" || typeof info.time.completed !== "number") return
+      if (reportedMessageIDs.has(info.id)) return
 
-          const lastMsg = response.data[response.data.length - 1]
-          const isTpsReport = lastMsg.parts.some(p => p.type === "text" && p.text.includes("▣ TPS |"))
-          if (isTpsReport) return
+      reportedMessageIDs.add(info.id)
+      let keepReported = false
+      let turnMessageIDs: string[] = []
 
-          const tps = calculateTPS(response.data, timings)
-          
-          // Cleanup tracked timings for this turn
-          response.data.forEach(m => timings.delete(m.info.id))
+      try {
+        const response = await client.session.messages({
+          path: { id: info.sessionID },
+          query: { limit: 500 },
+        })
 
-          if (tps) {
-            await client.session.prompt({
-              path: { id: sid },
-              body: {
-                noReply: true,
-                parts: [{ type: "text", text: `▣ TPS | Average Speed: ${tps} tps`, ignored: true }],
+        if (!response.data?.length) return
+
+        const assistantMessages = response.data
+          .filter((message): message is { info: AssistantMessage; parts: Part[] } => message.info.role === "assistant")
+          .filter((message) => message.info.parentID === info.parentID)
+
+        if (!assistantMessages.length) return
+
+        turnMessageIDs = assistantMessages.map((message) => message.info.id)
+        const turnInput = collectTurnInput({
+          assistantMessages,
+          completedAt: info.time.completed,
+          streamWindowByMessageID,
+        })
+        if (!turnInput) return
+
+        const metrics = calculateTPS(turnInput)
+
+        if (!metrics) return
+
+        const latencyText =
+          typeof metrics.timeToFirstTokenMs === "number"
+            ? `${(metrics.timeToFirstTokenMs / 1000).toFixed(2)}s`
+            : "n/a"
+
+        await client.session.prompt({
+          path: { id: info.sessionID },
+          body: {
+            noReply: true,
+            parts: [
+              {
+                type: "text",
+                text: `▣ Lat.: ${latencyText} | E2E TPS: ${metrics.tps}`,
+                ignored: true,
+                metadata: { source: "opencode-tps-counter" },
               },
-            })
-          }
-        } catch {}
+            ],
+          },
+        })
+
+        keepReported = true
+      } catch {
+      } finally {
+        if (!keepReported) {
+          reportedMessageIDs.delete(info.id)
+          return
+        }
+
+        clearStreamWindows(streamWindowByMessageID, turnMessageIDs)
       }
     },
   }

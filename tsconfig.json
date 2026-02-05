@@ -22,8 +22,10 @@
     "noImplicitOverride": true,
 
     // Some stricter flags (disabled by default)
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "noPropertyAccessFromIndexSignature": false
-  }
+  },
+  "include": ["index.ts", "turn.ts", "utils.ts"],
+  "exclude": ["opencode", "node_modules"]
 }
